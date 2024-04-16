@@ -1,0 +1,152 @@
+---
+title: "Untitled"
+author: "Caleb vonMaydell"
+date: "2024-04-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r cars, warning = FALSE}
+library(naivebayes)
+library(dplyr)
+library(ggplot2)
+library(psych)
+library(caret)
+library(randomForest)
+library(caTools)
+library(e1071)
+library(tidyr)
+
+Simdata <- read.csv("C:/Users/Caleb/Downloads/archive (7)/bs140513_032310.csv")
+table(Simdata$zipMerchant)  
+table(Simdata$zipMerchant)  
+table(Simdata$zipcodeOri)  #these three variable means nothing since they do not change, will be removed
+Simdata <-Simdata[,-5]
+Simdata <-Simdata[,-5]
+Simdata <-Simdata[,-5]
+
+Simdata <-Simdata[,-2]  #customer number is removed becuase it causes issues
+
+```
+
+```{r khh}
+
+# see the rates among each account gender/type
+table(Simdata$gender, Simdata$fraud)
+table(Simdata$age, Simdata$fraud)
+#these appear uncorrelated at first glance
+
+table(Simdata$category, Simdata$fraud)
+
+plot(Simdata$amount,Simdata$fraud)
+#notice that both of these latters categories are likely good indicators.  
+
+```
+
+```{r innit}
+  set.seed(101) 
+sample = sample.split(Simdata$fraud, SplitRatio = .7)
+train = subset(Simdata, sample == TRUE)
+test  = subset(Simdata, sample == FALSE)
+
+#ensure decent splitting
+table(test$fraud)
+table(train$fraud)
+
+nB_model <- naiveBayes(fraud ~., data = train)
+pred <- predict(nB_model, test, type="raw") 
+#if the chance of fraud is >30% we consider it fraud
+test$predicted <- ifelse(pred[,2] > 0.3, 1, 0)
+
+table(test$predicted, test$fraud)
+
+```
+
+
+```{r knn}
+#dissimilarity value
+euclidean_distance = function(a, b){
+      distc =0
+      if (a$category!=b$category){
+        distc = 50}
+     
+      distan = sqrt(distc + (a$amount-b$amount)**2)
+      return(distan)
+  }
+
+nearest_neighbors = function(x,obs, k, FUN, p = NULL){
+  
+  # Check the number of observations is the same
+  if(ncol(x) != ncol(obs)){
+    stop('Data must have the same number of variables')
+  }
+  
+  # Calculate distance, considering p for Minkowski-from stackoverflow
+  if(is.null(p)){
+    dist = apply(x,1, FUN,obs)  
+  }else{
+    dist = apply(x,1, FUN,obs,p)
+  }
+  
+  # Find closest neighbours
+  distances = sort(dist)[1:k]
+  neighbor_ind = which(dist %in% sort(dist)[1:k])
+  
+  if(length(neighbor_ind)!= k){
+    warning(
+      paste('Several variables with equal distance. Used k:',length(neighbor_ind))
+    )
+  }
+  
+  ret = list(neighbor_ind, distances)
+  return(ret)
+}
+
+train$category= as.factor(train$category)
+train$gender = as.factor(train$gender)
+
+
+```
+
+```{r seconddataset}
+creditcard <- read.csv("C:/Users/Caleb/Downloads/archive (6)/creditcard.csv", header=FALSE)
+creditcard<-creditcard[-1,] #first column is titles
+creditcard<-creditcard[,-1] #row number
+creditcard_numeric <- as.data.frame(lapply(creditcard, as.numeric))
+```
+
+```{r explor}
+creditcard <- as.data.frame(sapply(creditcard, as.numeric))
+correlations <- cor(creditcard, creditcard$V31)
+
+top_correlations <- sort(correlations[], decreasing = TRUE)[1:4] #after the first three they fall off 
+top_correlations
+
+sorted_correlations <- sort(correlations[], decreasing = FALSE)[1:10]  #lots before cutoffs
+
+correlations <- cor(creditcard, creditcard$V31)
+
+# Sort the correlations in ascending order
+sorted_correlations <- sort(correlations, decreasing = FALSE)
+top_4_correlations <- names(sorted_correlations)[1:4]
+
+# Get the bottom 10 correlated columns
+bottom_10_correlations <- names(sorted_correlations)[(length(sorted_correlations) - 9):length(sorted_correlations)]
+
+# Combine the top 4 and bottom 10 correlated columns
+selected_columns <- c(top_4_correlations, bottom_10_correlations)
+
+# Create a new matrix containing the selected columns
+reducedcredit <- correlations[selected_columns, drop = FALSE]
+
+#ensure same split
+  set.seed(101) 
+sample = sample.split(Simdata$fraud, SplitRatio = .7)
+train = subset(reducedcredit, sample == TRUE)
+test  = subset(reducedcredit, sample == FALSE)
+```
